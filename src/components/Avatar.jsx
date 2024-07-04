@@ -5,20 +5,63 @@ Command: npx gltfjsx@6.2.18 .\public\models\667549e8f636bee47d330423.glb
 
 import React, {useEffect, useRef} from 'react'
 import {useGLTF, useFBX, useAnimations} from '@react-three/drei'
+import {useFrame} from "@react-three/fiber";
+import {useControls} from "leva";
 
 export function Avatar(props) {
+    const {animation} = props
+
+    const {headFollow, cursorFollow, wireframe} = useControls({
+        headFollow: false,
+        cursorFollow: false,
+        wireframe: false
+    })
     const group = useRef()
     const {nodes, materials} = useGLTF('models/667549e8f636bee47d330423.glb')
-    const {animations: typingAnimation} = useFBX("animations/Typing.fbx");
+    const { animations: typingAnimation } = useFBX("animations/Typing.fbx");
+    const { animations: standingAnimation } = useFBX(
+        "animations/Standing Idle.fbx"
+    );
+    const { animations: fallingAnimation } = useFBX(
+        "animations/Falling Idle.fbx"
+    );
 
+    //애니메이션 이름 수정
     typingAnimation[0].name = "Typing";
-    const {actions} = useAnimations(typingAnimation, group)
+    standingAnimation[0].name = "Standing";
+    fallingAnimation[0].name = "Falling";
+    //애니메이션 추가
+    const { actions } = useAnimations(
+        [typingAnimation[0], standingAnimation[0], fallingAnimation[0]],
+        group
+    );
 
-    //typing 가능해짐
+    useFrame((state) => {
+        if (headFollow) {
+            //머리가 카메라를 보도록
+            group.current.getObjectByName("Head").lookAt(state.camera.position)
+        }
+        if (cursorFollow){
+            const target = new THREE.Vector3(state.mouse.x, state.mouse.y, 1)
+            group.current.getObjectByName("Head").lookAt(target)
+
+        }
+    })
+
     useEffect(() => {
-        actions["Typing"].reset().play()
-    }, [])
+        //인자로 들어온 animation으로 actions을 선택
+        //선택된 action 플레이
+        actions[animation].reset().fadeIn(0.5).play()
+        //cleanup - 선택된 action으로 fadeOut
+        return () => actions[animation].fadeOut(0.5)
+    }, [animation])
 
+    //wireframe 변경 시 모든 material의 wireframe을 변경
+    useEffect(() => {
+        Object.values(materials).forEach((material) => {
+            material.wireframe = wireframe
+        })
+    }, [wireframe]);
     return (
         <group {...props} ref={group} dispose={null}>
             <group rotation-x={-Math.PI / 2}>
